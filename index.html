@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SwiftShop Portal - Runner Dispatch</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col justify-between antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- 🚨 LOUD ALARM FLOATING ALERT BANNER -->
+  <div id="alarmBanner" style="display:none;" class="fixed top-0 left-0 right-0 z-50 bg-rose-600 text-white px-4 py-3 shadow-2xl flex items-center justify-between animate-bounce">
+    <div class="flex items-center gap-3">
+      <span class="text-2xl animate-pulse">🔔</span>
+      <div>
+        <p class="font-extrabold text-sm uppercase tracking-wide">NEW ORDER READY FOR PICKUP!</p>
+        <p class="text-xs text-rose-100 font-medium">Claim the order below to accept and silence the alarm.</p>
+      </div>
+    </div>
+    <button onclick="stopLoudAlarm()" class="bg-white text-rose-700 hover:bg-rose-50 font-bold px-4 py-2 rounded-xl text-xs uppercase tracking-wider shadow-sm transition active:scale-95">
+      🔕 Silence Alarm
+    </button>
+  </div>
+
+  <!-- 🔐 RUNNER LOGIN SCREEN -->
+  <div id="loginScreen" style="display:none;" class="flex items-center justify-center min-h-screen px-4 py-12">
+    <div class="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200/80">
+      
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-emerald-50 rounded-full mb-4 shadow-md shadow-emerald-600/20 overflow-hidden border-2 border-emerald-200">
+          <img src="https://i.imgur.com/oh9MYxE.png" alt="SwiftShop Logo" class="w-full h-full object-cover">
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Runner Portal</h1>
+        <p class="text-slate-500 text-sm mt-1">Select your runner profile and authenticate below</p>
+      </div>
+      
+      <div class="space-y-6">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Runner ID</label>
+          <select id="loginRunnerSelect" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition">
+            <option value="">Choose profile...</option>
+            <option value="Runner 1">Runner 1</option>
+            <option value="Runner 2">Runner 2</option>
+            <option value="Runner 3">Runner 3</option>
+            <option value="Express Dispatch">Express Dispatch</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Access PIN Code</label>
+          <input type="password" id="loginPin" placeholder="••••" maxlength="6" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition shadow-inner">
+        </div>
+
+        <button onclick="handleRunnerLogin()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/25 active:scale-[0.98] transition">
+          Launch Dispatch Console
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 🛵 RUNNER DASHBOARD -->
+  <div id="dashboardScreen" class="container max-w-6xl mx-auto px-4 py-6 flex-grow" style="display:none;">
+    
+    <!-- Top Bar Header -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center overflow-hidden shadow-inner text-2xl">
+          🛵
+        </div>
+        <div>
+          <h2 id="runnerTitle" class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Runner Console</h2>
+          <div class="flex items-center gap-2 mt-1 flex-wrap">
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Live Audio Dispatch Active
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <button onclick="fetchOrders()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-xs active:scale-95">🔄 Refresh</button>
+        <button onclick="handleRunnerLogout()" class="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-sm active:scale-95">Logout</button>
+      </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="flex gap-2 border-b border-slate-200 mb-6 overflow-x-auto pb-1">
+      <button id="tabAvailable" onclick="switchTab('available')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition bg-emerald-600 text-white shadow-sm flex items-center gap-2">
+        <span>Ready for Pickup</span>
+        <span id="badgeAvailable" class="bg-white text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
+      </button>
+      <button id="tabActive" onclick="switchTab('active')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition bg-slate-200 text-slate-700 hover:bg-slate-300 flex items-center gap-2">
+        <span>My Active Deliveries</span>
+        <span id="badgeActive" class="bg-slate-400 text-white text-[10px] font-black px-2 py-0.5 rounded-full">0</span>
+      </button>
+      <button id="tabHistory" onclick="switchTab('history')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition bg-slate-200 text-slate-700 hover:bg-slate-300 flex items-center gap-2">
+        <span>Completed Deliveries</span>
+      </button>
+    </div>
+
+    <!-- Active Stream Container -->
+    <div id="ordersContainer" class="space-y-4">
+      <div class="text-center py-12 text-slate-400 text-sm">Loading orders from live database...</div>
+    </div>
+
+  </div>
+
+  <footer class="text-center py-6 text-xs text-slate-400 border-t border-slate-200/60 mt-12 bg-white">
+    SwiftShop Logistics &copy; 2026 — Driver & Runner Operations Console
+  </footer>
+
+<script>
+  // 🔗 SUPABASE CONNECTION
+  const SUPABASE_URL = "https://sbjadbqlmkktljfpqowc.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNiamFkYnFsbWtrdGxqZnBxb3djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5MTc2NTIsImV4cCI6MjEwMjQ5MzY1Mn0.RCgn8yNmxkQWFPu6sJdyYD3_zJ7n2QmvPQjqZC70F8s";
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // 🔑 AUTH CREDENTIALS
+  const runnerPin = "1234";
+
+  let activeRunner = "";
+  let currentTab = "available";
+  let allOrders = [];
+  let knownReadyOrderIds = new Set();
+  let audioContext = null;
+  let alarmInterval = null;
+
+  // 🔊 SYNTHESIZED WEB AUDIO ALARM
+  function initAudioContext() {
+    if (!audioContext) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        audioContext = new AudioContext();
+      }
+    }
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+  }
+
+  function playBeepSound() {
+    if (!audioContext) return;
+    try {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(880, audioContext.currentTime); // High pitch (A5)
+      osc.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.25);
+
+      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.25);
+
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+
+      osc.start();
+      osc.stop(audioContext.currentTime + 0.25);
+    } catch (e) {
+      console.warn("Audio playback issue:", e);
+    }
+  }
+
+  function triggerLoudAlarm() {
+    initAudioContext();
+    document.getElementById("alarmBanner").style.display = "flex";
+    if (!alarmInterval) {
+      playBeepSound();
+      alarmInterval = setInterval(() => {
+        playBeepSound();
+      }, 500); // Pulse beep every 500ms
+    }
+  }
+
+  function stopLoudAlarm() {
+    document.getElementById("alarmBanner").style.display = "none";
+    if (alarmInterval) {
+      clearInterval(alarmInterval);
+      alarmInterval = null;
+    }
+  }
+
+  function handleRunnerLogin() {
+    const selectedRunner = document.getElementById("loginRunnerSelect").value;
+    const pinInput = document.getElementById("loginPin").value.trim();
+
+    if (!selectedRunner) {
+      alert("Please select a runner profile.");
+      return;
+    }
+
+    if (pinInput === runnerPin) {
+      activeRunner = selectedRunner;
+      localStorage.setItem("runnerName", selectedRunner);
+      initAudioContext();
+      initDashboard();
+    } else {
+      alert("Incorrect PIN code. Please enter '1234'.");
+    }
+  }
+
+  function handleRunnerLogout() {
+    stopLoudAlarm();
+    localStorage.removeItem("runnerName");
+    location.reload();
+  }
+
+  function initDashboard() {
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("dashboardScreen").style.display = "block";
+    document.getElementById("runnerTitle").innerText = `Console: ${activeRunner}`;
+
+    fetchOrders(true);
+    setupRealtimeSubscription();
+  }
+
+  function switchTab(tabName) {
+    currentTab = tabName;
+    const tabAvail = document.getElementById("tabAvailable");
+    const tabAct = document.getElementById("tabActive");
+    const tabHist = document.getElementById("tabHistory");
+
+    const defaultClass = "px-5 py-2.5 text-xs font-bold rounded-xl transition bg-slate-200 text-slate-700 hover:bg-slate-300 flex items-center gap-2";
+    const activeClass = "px-5 py-2.5 text-xs font-bold rounded-xl transition bg-emerald-600 text-white shadow-sm flex items-center gap-2";
+
+    tabAvail.className = defaultClass;
+    tabAct.className = defaultClass;
+    tabHist.className = defaultClass;
+
+    if (tabName === "available") tabAvail.className = activeClass;
+    if (tabName === "active") tabAct.className = activeClass;
+    if (tabName === "history") tabHist.className = activeClass;
+
+    renderOrders();
+  }
+
+  async function fetchOrders(isInitialLoad = false) {
+    const container = document.getElementById("ordersContainer");
+    
+    const { data, error } = await supabaseClient
+      .from('orders')
+      .select('*')
+      .order('timestamp', { ascending: false });
+
+    if (error) {
+      container.innerHTML = `<div class="text-center py-6 text-red-500 text-sm">Error fetching orders: ${error.message}</div>`;
+      return;
+    }
+
+    const previousOrders = [...allOrders];
+    allOrders = data || [];
+
+    // Check for newly arriving "Ready" orders
+    const currentUnassignedReady = allOrders.filter(o => 
+      (o.status === 'Ready' || o.status === 'Pending') && 
+      (!o.active_status || o.active_status === '' || o.active_status === 'Unassigned')
+    );
+
+    let hasNewReadyOrder = false;
+    currentUnassignedReady.forEach(order => {
+      if (!knownReadyOrderIds.has(order.order_id)) {
+        knownReadyOrderIds.add(order.order_id);
+        if (!isInitialLoad) {
+          hasNewReadyOrder = true;
+        }
+      }
+    });
+
+    if (hasNewReadyOrder) {
+      triggerLoudAlarm();
+    } else if (currentUnassignedReady.length === 0) {
+      stopLoudAlarm();
+    }
+
+    updateBadges();
+    renderOrders();
+  }
+
+  function setupRealtimeSubscription() {
+    supabaseClient
+      .channel('orders-realtime-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchOrders(false);
+      })
+      .subscribe();
+  }
+
+  function updateBadges() {
+    const availableCount = allOrders.filter(o => 
+      (o.status === 'Ready' || o.status === 'Pending') && 
+      (!o.active_status || o.active_status === '' || o.active_status === 'Unassigned')
+    ).length;
+
+    const activeCount = allOrders.filter(o => 
+      (o.status === 'On the Way' || o.status === 'Claimed' || o.status === 'Ready') && 
+      o.active_status === activeRunner
+    ).length;
+
+    document.getElementById("badgeAvailable").innerText = availableCount;
+    document.getElementById("badgeActive").innerText = activeCount;
+  }
+
+  function renderOrders() {
+    const container = document.getElementById("ordersContainer");
+    let filtered = [];
+
+    if (currentTab === 'available') {
+      filtered = allOrders.filter(o => 
+        (o.status === 'Ready' || o.status === 'Pending') && 
+        (!o.active_status || o.active_status === '' || o.active_status === 'Unassigned')
+      );
+    } else if (currentTab === 'active') {
+      filtered = allOrders.filter(o => 
+        (o.status === 'On the Way' || o.status === 'Claimed' || o.status === 'Ready') && 
+        o.active_status === activeRunner
+      );
+    } else if (currentTab === 'history') {
+      filtered = allOrders.filter(o => 
+        o.status === 'Delivered' && 
+        o.active_status === activeRunner
+      );
+    }
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div class="text-center py-12 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-2xl bg-white">No orders currently in this queue.</div>`;
+      return;
+    }
+
+    let html = "";
+    filtered.forEach(order => {
+      let actionButtons = "";
+
+      if (currentTab === 'available') {
+        actionButtons = `
+          <button onclick="claimOrder('${order.order_id}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-emerald-600/20 active:scale-[0.98] transition flex items-center justify-center gap-2">
+            <span>✋ Accept & Claim Delivery</span>
+          </button>
+        `;
+      } else if (currentTab === 'active') {
+        if (order.status !== 'On the Way') {
+          actionButtons += `
+            <button onclick="updateOrderStatus('${order.order_id}', 'On the Way')" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-amber-500/20 active:scale-[0.98] transition">
+              🛵 Start Delivery (On the Way)
+            </button>
+          `;
+        }
+        actionButtons += `
+          <button onclick="updateOrderStatus('${order.order_id}', 'Delivered')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-emerald-600/20 active:scale-[0.98] transition">
+            ✅ Mark as Delivered
+          </button>
+        `;
+      }
+
+      let mapUrl = order.gps_link || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Orange Walk Town, Belize")}`;
+
+      html += `
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+          
+          <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-100 pb-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-black text-slate-400">ID: #${String(order.order_id).slice(-8)}</span>
+                <span class="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100 uppercase">${order.order_type || 'Delivery'}</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-0.5">${new Date(order.timestamp || Date.now()).toLocaleString()}</p>
+            </div>
+            <div>
+              <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                order.status === 'Ready' ? 'bg-amber-100 text-amber-800' :
+                order.status === 'On the Way' ? 'bg-blue-100 text-blue-800' :
+                order.status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
+              }">
+                ${order.status || 'Pending'}
+              </span>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded-xl text-xs space-y-2">
+            <div>
+              <p class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Customer Details</p>
+              <p class="font-extrabold text-slate-800 text-sm mt-0.5">${order.customer_name || 'Guest Customer'}</p>
+              ${order.email ? `<p class="text-slate-500 font-medium">${order.email}</p>` : ''}
+              ${order.phone ? `<p class="text-slate-700 font-bold mt-1">📞 ${order.phone}</p>` : ''}
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t border-slate-200/60">
+              ${order.phone ? `<a href="tel:${order.phone}" class="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-lg text-xs shadow-2xs hover:bg-slate-100">📞 Call Customer</a>` : ''}
+              <a href="${mapUrl}" target="_blank" class="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 font-bold px-3 py-1.5 rounded-lg text-xs shadow-2xs hover:bg-blue-100">🗺️ Open Map Navigation</a>
+            </div>
+          </div>
+
+          ${actionButtons ? `<div class="flex gap-3 pt-2">${actionButtons}</div>` : ''}
+
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  async function claimOrder(orderId) {
+    stopLoudAlarm();
+
+    const { error } = await supabaseClient
+      .from('orders')
+      .update({
+        active_status: activeRunner,
+        status: 'Claimed'
+      })
+      .eq('order_id', orderId);
+
+    if (error) {
+      alert("Failed to claim order: " + error.message);
+    } else {
+      switchTab('active');
+      fetchOrders(false);
+    }
+  }
+
+  async function updateOrderStatus(orderId, newStatus) {
+    const { error } = await supabaseClient
+      .from('orders')
+      .update({ status: newStatus })
+      .eq('order_id', orderId);
+
+    if (error) {
+      alert("Failed to update status: " + error.message);
+    } else {
+      if (newStatus === 'Delivered') switchTab('history');
+      fetchOrders(false);
+    }
+  }
+
+  // Global user click listener to initialize browser AudioContext
+  window.addEventListener('click', () => {
+    initAudioContext();
+  }, { once: true });
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const savedRunner = localStorage.getItem("runnerName");
+    if (savedRunner) {
+      activeRunner = savedRunner;
+      initDashboard();
+    } else {
+      document.getElementById("loginScreen").style.display = "flex";
+    }
+  });
+</script>
+
+</body>
+</html>
